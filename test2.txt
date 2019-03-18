@@ -1,0 +1,3 @@
+set b 20
+set b 25
+print b
