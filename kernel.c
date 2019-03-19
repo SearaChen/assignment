@@ -55,7 +55,8 @@ PCB* dequeueFromReady()
 
 int scheduler()
 {
-
+	printf("running scheduler!\n");
+	
 	int status = -1;
 	PCB* nextItem;
 	if (cpu->IP == (FILE* )NULL)

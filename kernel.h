@@ -1,7 +1,7 @@
 #ifndef _KERNEL_H_
 #define _KERNEL_H_
 
-#define MAXCHAR 10000
+#define MAXCHAR 1000
 
 #include "pcb.h"
 

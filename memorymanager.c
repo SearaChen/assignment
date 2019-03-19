@@ -10,8 +10,7 @@
 #include "memorymanager.h"
 
 
-//FILE *ram[RAMSIZE]; 
-
+// problems: WE NEVER CLOSED THE FILE POINTERS
 FILE* copyFile(FILE *fp1)
 {
 	//new file name 
@@ -30,6 +29,7 @@ FILE* copyFile(FILE *fp1)
 	char* filepath[100];
 	char snum[5];
 	strcpy(filepath, "./BackingStore/");
+	//strcpy(filepath, "");
 	sprintf(snum,"%d",file_count);
 	strcat(filepath,snum);
 	strcat(filepath, ".txt");
@@ -48,7 +48,8 @@ FILE* copyFile(FILE *fp1)
         c = fgetc(fp1); 
     } 
 
-	fclose(fp1);
+	rewind(backingP);
+	rewind(fp1);
 	return backingP;
 }
 
@@ -56,6 +57,7 @@ FILE* copyFile(FILE *fp1)
 int countTotalPages(FILE *fp)
 // count number of pages needed by a file program
 {
+	printf("running countTotalPages!\n");
 	char ch;
 	int lines = 0; 
 	while(!feof(fp))
@@ -69,7 +71,11 @@ int countTotalPages(FILE *fp)
 	fseek(fp, 0, SEEK_SET);
 
 	int pageNum =0;
+	printf("LIENS: %d\n", lines);
+
 	pageNum = (lines + PAGESIZE - 1) / PAGESIZE;
+	printf("%d\n", pageNum);
+	//exit(EXIT_SUCCESS);
 	return pageNum;
 }
 
@@ -77,31 +83,22 @@ int countTotalPages(FILE *fp)
 FILE* findPage(int pageNumber, FILE* f)
 {
 	// return the file pointer at the beginning of the page that is indicated by the page Number 
-	close(f);
-	exit(EXIT_SUCCESS);
+	//close(f);
 
 	FILE *fp2 = fdopen (dup (fileno (f)), "r");
 
 	if(f==NULL){printf("findPage first file is null!\n");}
 	if(fp2==NULL){printf("findPage second file is null!\n");}
-	rewind(f);
+	//rewind(f);
 	rewind(fp2);
 	int pageCount=0;
 
 	int lineCount = 0;
     char buffer[1000];
-    printf("your?\n");
-    	exit(EXIT_SUCCESS);
 
     while(pageCount != pageNumber && fgets(buffer, sizeof(buffer), fp2)!=  NULL)
     {
         lineCount++;
-        printf("lineCount: %d\n",lineCount);
-        printf("pageCount: %d\n",pageCount);
-
-        printf("%s", buffer);
-        printf("%ld\n",ftell(fp2));
-        printf("\n");
 
        	if (lineCount == PAGESIZE)
        	{
@@ -156,7 +153,7 @@ int isSameFilePointer(FILE*f1, FILE* f2)
 }
 
 
-int findFrame(FILE* page)
+int findFrame(FILE* page) // NOT ACTUALLY USED?
 {
 	int i;
 	for(i=0;i<RAMSIZE;i++)
@@ -169,11 +166,24 @@ int findFrame(FILE* page)
 
 	return -1;
 }
+// int findFrame(pageNumber)
+// {
+// 	int i;
+// 	for(i=0;i<RAMSIZE;i++)
+// 	{
+// 		if (isSameFilePointer(page, ram[i]) == 1)
+// 		{
+// 			return i;
+// 		}
+// 	}
+
+// 	return -1;
+// }
 
 
 int findVictim(PCB*p)
 {
-
+	// NOTE:  will not work if a process has 10 pages already in RAM 
 	srand(time(NULL));   // Initialization, should only be called once.
 	int r = rand();
 	
@@ -185,7 +195,7 @@ int findVictim(PCB*p)
 		int duplicate = -1;
 		for (i = 0; i < RAMSIZE; i++) //  make sure it is not any where on the pageTable
 		{
-			if (isSameFilePointer(ram[i], p->pageTable[r]) == 1) // if it is already in use
+			if (ram[i]!= NULL && isSameFilePointer(ram[i], p->pageTable[r]) == 1) // if it is already in use
 			{
 				duplicate=1;
 			} 
@@ -223,6 +233,25 @@ int updatePageTable(PCB *p, int pageNumber, int frameNumber)
 }
 
 
+void printRAM()
+{
+	int i;
+	for (i =0; i<10; i++)
+	{
+		printf("%d slot is: %p\n",i,(ram[i]));
+
+	}
+}
+
+void printPCBTable(PCB* pcb)
+{
+	int i;
+	for (i=0;i<10;i++)
+	{
+		printf("At page index: %d -- %d\n",i,pcb->pageTable[i]);
+	}
+}
+
 int launcher(FILE *p) // called by exec command
 {
 	// count number of files 
@@ -234,37 +263,44 @@ int launcher(FILE *p) // called by exec command
 		printf("backingPtr is null\n");
 	}
 
-
 	fseek(backingPtr, 0, SEEK_SET);
-	printf("rillldfap?\n");
 	int num_pages=countTotalPages(backingPtr);
 	printf("num of pages: %d\n",num_pages);
-	addToRAM(p); // add first page
+	int firstPageFrameNumber=addToRAM(backingPtr); // add first page
+
+	int secondPageFrameNumber=-1;
 	if (num_pages>1)
 	{
-		// printf("rilllp?\n");
-	 //    	exit(EXIT_SUCCESS);
-		FILE* nextpage = findPage(1, p); // looking for the second page
-		
-		// printf("rilllp?\n");
-    	exit(EXIT_SUCCESS);
-		addToRAM(nextpage);
+		FILE* nextpage = findPage(1, backingPtr); // looking for the second page
+		secondPageFrameNumber= addToRAM(nextpage);
 	}
-	printf("we have done something!!\n");
-	//printRAM();
+
+	printRAM();
+
+	// creating 1 pcb for 1 process (not 1 page)
+	PCB* newPCB;
+	newPCB = makePCB(backingPtr);
+	if (secondPageFrameNumber <0 && num_pages > 1)
+	{
+		printf("Memory manager: Second page frame number smaller than zero!\n");
+	}
+
+	updatePageTable(newPCB, 0, firstPageFrameNumber);
+	if (secondPageFrameNumber >=0)
+	{
+		updatePageTable(newPCB, 1, secondPageFrameNumber);
+	}
+
+	printPCBTable(newPCB);
+	newPCB->pages_max=num_pages;
+	printf("launcherdone! \n");
+
+	addToReady(newPCB);
+	printf("PCB added to queue!");
 	return 1;
 
 }
 
-void printRAM()
-{
-	int i;
-	for (i =0; i<10; i++)
-	{
-		printf("%d slot is: %ld\n",i,ftell(ram[i]));
-
-	}
-}
 
 // void myinit(FILE* fp) //To be deleted 
 // {

@@ -70,6 +70,8 @@ int exec()
 	fp = fopen("test1.txt", "r");
 	launcher(fp);
 
+
+
 	// queue all programs
 	/*while (i < commandWordCount)
 	{
@@ -104,7 +106,11 @@ int exec()
 			i++;
 		}
 	}*/
-
+	if (READYHEAD ==  NULL )
+	{
+		printf("why is ready null?\n");
+		exit(EXIT_SUCCESS);
+	}
 	// performing robin-go-round
 	while(READYHEAD != (ReadyQueueNode *) NULL && READYHEAD !=  NULL )
 	{	
@@ -118,17 +124,6 @@ int exec()
 		//robin_go_count++;
 
 	}
-
-	// checking if all RAM are empty 
-	// int in;
-	// while (in < 10)
-	// {
-	// 	if (ram[in]!= NULL)
-	// 	{
-	// 		printf("the ram is not empty!\n");
-	// 	}
-	// 	in++;
-	// }
 
 	return 1;
 }
