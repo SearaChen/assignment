@@ -9,6 +9,7 @@ typedef struct{
    int pages_max;
 }PCB;
 
-PCB* makePCB(FILE* fp);
+PCB* makePCB(FILE*fp);
+void printPCBPageTable(PCB* pcb);
 
 #endif

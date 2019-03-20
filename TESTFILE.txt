@@ -1,4 +1,1 @@
-help
-set bob 10
-print bob
 exec test1.txt test2.txt test3.txt

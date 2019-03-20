@@ -61,19 +61,23 @@ int run(char* filepath)
 	return 1;
 }
 
-//int exec(int commandWordCount, char **args)
-int exec()
+int exec(int commandWordCount, char **args)
+//int exec()
 {
-	printf("are we executing this?\n");
 	int i =1; 
-	FILE *fp ;
+	/*FILE *fp ;
+	FILE *fp2 ;
+	FILE *fp3 ;
+
 	fp = fopen("test1.txt", "r");
 	launcher(fp);
-
-
+	fp2 = fopen("test2.txt", "r");
+	launcher(fp2);
+	fp3 = fopen("test3.txt", "r");
+	launcher(fp3);*/
 
 	// queue all programs
-	/*while (i < commandWordCount)
+	while (i < commandWordCount)
 	{
 		FILE *fp ;
 		if( access( args[i], F_OK ) == -1 )
@@ -83,34 +87,19 @@ int exec()
 		}
 		else
 		{
-			// check for double loading 
-			int doubleLoaded = -1; // default to not double loaded
-			int j;
-			for(j=1; j < i; j++)
-			{
-				if (strcmp(args[j],args[i]) == 0)
-				{
-					doubleLoaded =1;
-					break;
-				}
-			}
-			if (doubleLoaded ==1)
-			{
-				printf("Error: Script %s already loaded\n", args[j]);
-				i++;
-				continue;
-			}
 	    	fp = fopen(args[i], "r");
 	    	launcher(fp);
 
 			i++;
 		}
-	}*/
+	}
+
 	if (READYHEAD ==  NULL )
 	{
 		printf("why is ready null?\n");
 		exit(EXIT_SUCCESS);
 	}
+	
 	// performing robin-go-round
 	while(READYHEAD != (ReadyQueueNode *) NULL && READYHEAD !=  NULL )
 	{	
@@ -149,7 +138,7 @@ int interpret(char **args)
 		status = help();
 		if (status == 1)
 		{
-			printf("help: Displays all the commands\nquit: Exits / terminates the shell with \"Bye!\"\nset: Assigns a value to shell memory\nprint: Prints the STRING assigned to VAR\nrun: Executes the file SCRIPT.TXT\n");
+			printf("help: Displays all the commands\nquit: Exits / terminates the shell with \"Bye!\"\nset: Assigns a value to shell memory\nprint: Prints the STRING assigned to VAR\nrun: Executes the file SCRIPT.TXT\nexec: execute up to 3 programs at the same time\n");
 		}
 		return status;
 	}
@@ -173,10 +162,10 @@ int interpret(char **args)
 		status= run(args[1]);
 		return status;
 	}
-	else if(strcmp(args[0],"exec") == 0 && (commandWordCount > 0 && commandWordCount < 5))
+	else if(strcmp(args[0],"exec") == 0 && (commandWordCount > 1 && commandWordCount < 5))
 	{
-		//status= exec(commandWordCount, args);
-		status= exec();
+		status= exec(commandWordCount, args);
+		//status= exec();
 		return 1;
 		
 	}

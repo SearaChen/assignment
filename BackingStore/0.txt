@@ -1,8 +1,16 @@
-set a 1
+set a 1a
 print a 
 print a
 print a 
-set b 2
+set b 1b
 print b
 print b
 print b
+set c 1c
+print c 
+print c
+print c 
+set d 1d
+print d
+print d
+print d

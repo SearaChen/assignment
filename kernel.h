@@ -6,6 +6,7 @@
 #include "pcb.h"
 
 typedef struct readyqueuenode{
+	int id;
 	PCB* pcb;
 	struct readyqueuenode * next;
 } ReadyQueueNode;

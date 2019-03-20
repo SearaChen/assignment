@@ -57,7 +57,6 @@ FILE* copyFile(FILE *fp1)
 int countTotalPages(FILE *fp)
 // count number of pages needed by a file program
 {
-	printf("running countTotalPages!\n");
 	char ch;
 	int lines = 0; 
 	while(!feof(fp))
@@ -71,11 +70,8 @@ int countTotalPages(FILE *fp)
 	fseek(fp, 0, SEEK_SET);
 
 	int pageNum =0;
-	printf("LIENS: %d\n", lines);
 
 	pageNum = (lines + PAGESIZE - 1) / PAGESIZE;
-	printf("%d\n", pageNum);
-	//exit(EXIT_SUCCESS);
 	return pageNum;
 }
 
@@ -130,8 +126,13 @@ int same_file_helper(int fd1, int fd2) {
 
 int isSameFilePointer(FILE*f1, FILE* f2)
 {
+	
+	printf("running isSameFilePointer!\n");
 	int fd1 = fileno(f1);
+	exit(EXIT_SUCCESS);
+
 	int fd2 = fileno(f2);
+	exit(EXIT_SUCCESS);
     struct stat stat1, stat2;
     if(fstat(fd1, &stat1) < 0) return -1;
     if(fstat(fd2, &stat2) < 0) return -1;
@@ -143,29 +144,35 @@ int isSameFilePointer(FILE*f1, FILE* f2)
 		}
 		else
 		{
-			return -1;
+			return 0;
 		}
 	}
 	else
 	{
-		return -1;
+		return 0;
 	}
 }
 
 
 int findFrame(FILE* page) // NOT ACTUALLY USED?
 {
+	//Note: page argument not actually needed
+	int frameNumber = -1;
+
+	// find a frame number that is empty first 
 	int i;
-	for(i=0;i<RAMSIZE;i++)
+	for (i=0;i<10;i++)
 	{
-		if (isSameFilePointer(page, ram[i]) == 1)
+		if (ram[i] == NULL)
 		{
-			return i;
+			frameNumber=i;
+			//ram[frameNumber] = page;
+			break;
 		}
 	}
-
-	return -1;
+	return frameNumber;
 }
+
 // int findFrame(pageNumber)
 // {
 // 	int i;
@@ -184,25 +191,27 @@ int findFrame(FILE* page) // NOT ACTUALLY USED?
 int findVictim(PCB*p)
 {
 	// NOTE:  will not work if a process has 10 pages already in RAM 
-	srand(time(NULL));   // Initialization, should only be called once.
 	int r = rand();
-	
+	//printf("initial random number: %d\n",r);
 	int count;
-	for (count =0; count > RAMSIZE; count ++){ // loop through all possible slots
+	for (count =0; count < RAMSIZE; count ++){ // loop through ALL SPACE in ram
 		r= r % RAMSIZE; 
-
+		//printf("try random number: %d\n",r);
 		int i;
 		int duplicate = -1;
 		for (i = 0; i < RAMSIZE; i++) //  make sure it is not any where on the pageTable
 		{
-			if (ram[i]!= NULL && isSameFilePointer(ram[i], p->pageTable[r]) == 1) // if it is already in use
+			if (ram[i]!= NULL && p->pageTable[i]==r )//(isSameFilePointer(ram[r], p->pageTable[i]) == 1)) // if it is already in use
 			{
+				//printf("ram slot %d has same this process's page #%d\n",r,i);
 				duplicate=1;
+				break;
 			} 
 		}
 
 		if(duplicate == -1 ) // there is no duplicate, 
 		{
+			//printf("has found appropriate ram slot: %d\n",r);
 			return r;
 		}
 		else
@@ -232,17 +241,6 @@ int updatePageTable(PCB *p, int pageNumber, int frameNumber)
 	p->pageTable[pageNumber] = frameNumber; 
 }
 
-
-void printRAM()
-{
-	int i;
-	for (i =0; i<10; i++)
-	{
-		printf("%d slot is: %p\n",i,(ram[i]));
-
-	}
-}
-
 void printPCBTable(PCB* pcb)
 {
 	int i;
@@ -265,7 +263,6 @@ int launcher(FILE *p) // called by exec command
 
 	fseek(backingPtr, 0, SEEK_SET);
 	int num_pages=countTotalPages(backingPtr);
-	printf("num of pages: %d\n",num_pages);
 	int firstPageFrameNumber=addToRAM(backingPtr); // add first page
 
 	int secondPageFrameNumber=-1;
@@ -275,14 +272,15 @@ int launcher(FILE *p) // called by exec command
 		secondPageFrameNumber= addToRAM(nextpage);
 	}
 
-	printRAM();
+	//printRAM();
 
 	// creating 1 pcb for 1 process (not 1 page)
 	PCB* newPCB;
 	newPCB = makePCB(backingPtr);
-	if (secondPageFrameNumber <0 && num_pages > 1)
+	if (secondPageFrameNumber < 0 && num_pages > 1)
 	{
-		printf("Memory manager: Second page frame number smaller than zero!\n");
+		printf("Error-Memory manager: Second page frame number smaller than zero!\n");
+		exit(EXIT_SUCCESS);
 	}
 
 	updatePageTable(newPCB, 0, firstPageFrameNumber);
@@ -291,12 +289,12 @@ int launcher(FILE *p) // called by exec command
 		updatePageTable(newPCB, 1, secondPageFrameNumber);
 	}
 
-	printPCBTable(newPCB);
+	//printPCBTable(newPCB);
 	newPCB->pages_max=num_pages;
-	printf("launcherdone! \n");
+	//printf("launcherdone! \n");
 
 	addToReady(newPCB);
-	printf("PCB added to queue!");
+	//printf("PCB added to queue!\n");
 	return 1;
 
 }

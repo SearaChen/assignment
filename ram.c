@@ -18,6 +18,7 @@ void RAMInitialize()
 		ram[i] = (FILE*) (NULL);
 		i++;
 	}
+
 }
 
 int addToRAM(FILE *fp)
@@ -41,17 +42,44 @@ int addToRAM(FILE *fp)
 	return result;
 }
 
-void freeFromRAM(FILE *fp)
+void freeFromRAM(PCB *pcb)
+{	/* Delete all pages associate with the pcb from ram
+		*/
+    int p_i;
+    for (p_i = 0; p_i < RAMSPACE; p_i++)
+    {
+    	int frameNumber=pcb->pageTable[p_i];
+        if (frameNumber!= -1) // if it has a valid entry
+      	{
+        	fclose(ram[frameNumber]);
+        	ram[frameNumber] = NULL; 
+      	}
+    }
+    //printf("process cleaned from ram!\n");
+    //printRAM();
+}
+
+
+void wipeRAM()
 {
     int index;
     for (index = 0; index < RAMSPACE; index++)
     {
-        if (ram[index] == fp)
-        {
-            //assign pointer to empty space 
-            fclose(ram[index]);
-            ram[index] = NULL; 
-            break;
-        } 
+    	fclose(ram[index]);
+        ram[index] =NULL;
     }
+}
+
+
+void printRAM()
+{
+	int i;
+	printf("===== RAM =========\n");
+	for (i =0; i<10; i++)
+	{
+		printf("%d slot is: %p\n",i,(ram[i]));
+
+	}
+		printf("==================\n");
+
 }

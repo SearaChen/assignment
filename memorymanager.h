@@ -12,7 +12,7 @@ FILE* findPage(int pageNumber, FILE* f);
 int isSameFilePointer(FILE*f1, FILE* f2);
 int findFrame(FILE* page);
 int findVictim(PCB*p);
-int updateFrame(int frameNumber, int victimFrame, FILE *page);
+int updateFrame(int frameNumber, int victimFrame, FILE *page); // not used
 int updatePageTable(PCB *p, int pageNumber, int frameNumber);
 int launcher(FILE *p);
 

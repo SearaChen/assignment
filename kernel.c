@@ -31,6 +31,7 @@ void addToReady(PCB* toAddPCB)
 	ReadyQueueNode * newnode = malloc(sizeof(ReadyQueueNode));
 	newnode->pcb = toAddPCB;
 	newnode->next= NULL;
+	newnode->id = current_id;
 
 	current = newnode;
 
@@ -54,9 +55,7 @@ PCB* dequeueFromReady()
 }
 
 int scheduler()
-{
-	printf("running scheduler!\n");
-	
+{	
 	int status = -1;
 	PCB* nextItem;
 	if (cpu->IP == (FILE* )NULL)
@@ -68,7 +67,7 @@ int scheduler()
 	if( status == 1) // the PCB has computed everything
 	{
 		fseek(nextItem->PC, 0, SEEK_SET); 
-		freeFromRAM(nextItem->PC);
+		freeFromRAM(nextItem);
 		free(nextItem); 
 	}
 	else  	// the PCB have some left over  == 0

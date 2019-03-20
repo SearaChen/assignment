@@ -1,3 +1,16 @@
-set b 20
-set b 25
+set a 2a
+print a 
+print a
+print a 
+set b 2b
 print b
+print b
+print b
+set c 2c
+print c 
+print c
+print c 
+set d 2d
+print d
+print d
+print d

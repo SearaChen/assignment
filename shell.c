@@ -130,6 +130,6 @@ void lsh_loop()
 
 void UIInstantiate()
 {
-   printf("Kernel 1.0 loaded!\nWelcome to the Seara Chen shell!\nShell version 2.0 Updated February 2019\n");
+   printf("Kernel 1.0 loaded!\nWelcome to the Seara Chen shell!\nShell version 3.0 Updated March 2019\n");
    lsh_loop();
 }
