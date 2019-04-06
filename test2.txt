@@ -1,16 +1,16 @@
 set a 2a
 print a 
-print a
+set a 2aa
 print a 
 set b 2b
 print b
-print b
+set b 2bb
 print b
 set c 2c
 print c 
-print c
+set c 2cc
 print c 
 set d 2d
 print d
-print d
+set d 2dd
 print d

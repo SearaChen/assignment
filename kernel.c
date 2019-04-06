@@ -50,7 +50,7 @@ PCB* dequeueFromReady()
 {
 	ReadyQueueNode* headNext = READYHEAD->next;
 	ReadyQueueNode* result = READYHEAD;
-	READYHEAD = headNext;
+	READYHEAD = headNext; 
 	return result->pcb;
 }
 
@@ -67,7 +67,7 @@ int scheduler()
 	if( status == 1) // the PCB has computed everything
 	{
 		fseek(nextItem->PC, 0, SEEK_SET); 
-		freeFromRAM(nextItem);
+		freeFromRAM(nextItem); // IS THIS CORRECT? 
 		free(nextItem); 
 	}
 	else  	// the PCB have some left over  == 0

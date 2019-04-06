@@ -15,5 +15,6 @@ int findVictim(PCB*p);
 int updateFrame(int frameNumber, int victimFrame, FILE *page); // not used
 int updatePageTable(PCB *p, int pageNumber, int frameNumber);
 int launcher(FILE *p);
+void wipeBackingStore();
 
 #endif

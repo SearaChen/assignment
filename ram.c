@@ -21,6 +21,7 @@ void RAMInitialize()
 
 }
 
+
 int addToRAM(FILE *fp)
 {
 	// return : the index of ram at which fp is added
@@ -41,6 +42,7 @@ int addToRAM(FILE *fp)
 	}
 	return result;
 }
+
 
 void freeFromRAM(PCB *pcb)
 {	/* Delete all pages associate with the pcb from ram

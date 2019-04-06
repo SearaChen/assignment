@@ -11,6 +11,7 @@
 #include "interpreter.h"
 #include "shell.h"
 #include "ram.h"
+#include "memorymanager.h"
 
 
 #define MAXCHAR 10000
@@ -93,12 +94,6 @@ int exec(int commandWordCount, char **args)
 			i++;
 		}
 	}
-
-	if (READYHEAD ==  NULL )
-	{
-		printf("why is ready null?\n");
-		exit(EXIT_SUCCESS);
-	}
 	
 	// performing robin-go-round
 	while(READYHEAD != (ReadyQueueNode *) NULL && READYHEAD !=  NULL )
@@ -110,10 +105,11 @@ int exec(int commandWordCount, char **args)
 		{
 			printf("CPU is somehow not available error!");
 		}
-		//robin_go_count++;
-
 	}
 
+	// wipe backing store
+	wipeBackingStore();
+	
 	return 1;
 }
 

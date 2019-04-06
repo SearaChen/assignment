@@ -5,6 +5,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <sys/types.h>
+
 
 #include "ram.h"
 #include "memorymanager.h"
@@ -296,7 +298,24 @@ int launcher(FILE *p) // called by exec command
 	addToReady(newPCB);
 	//printf("PCB added to queue!\n");
 	return 1;
+}
 
+void wipeBackingStore()
+{
+	int check;
+	char is_empty[100];
+	FILE * output;
+
+	output = popen("cd ./BackingStore/; ls | wc -l","r"); 
+	fgets (is_empty, 100, output); //write to the char
+	pclose (output);
+
+	check = atoi(is_empty);
+
+	if (check > 0)
+	{
+		system("exec rm -r ./BackingStore/*");
+	}
 }
 
 

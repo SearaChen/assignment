@@ -1,10 +1,15 @@
+set a 3a
 help
-help
-help
-help
-help
-help
-help
-help
-set best_singer bts
-print best_singer
+set a 3aa
+print a 
+set b 3b
+print b
+set b 3bb
+print b
+set c 3c
+print c 
+set c 3cc
+print c 
+set d 3d
+print d
+print d
