@@ -3,10 +3,10 @@
 
 void initIO();
 int partition(char *name, int blocksize, int totalblocks); //loadFAT&createbuffer_block,returnsuccess/failure
-// int mount(char *name);
-// int openfile(char *name);
-// int readBlock(int file);
-// char *returnBlock();
-// int writeBlock(int file, char *data);
+int mount(char *name);
+int openfile(char *name);
+int readBlock(int file);
+char *returnBlock();
+int writeBlock(int file, char *data);
 
 #endif
