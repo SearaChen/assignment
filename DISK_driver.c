@@ -16,7 +16,7 @@ typedef struct PARTIT {
 
 
 typedef struct FAT {
-    char *filename;
+    char filename[100];
     int file_length;	// file length in number of blocks
     int blockPtrs[10]; 
     int current_location;
@@ -50,15 +50,29 @@ void encodeGlobalVariableToFile(FILE *partitionP)
 }
 
 
+void printFatTable()
+{	
+	printf("printing FAT table...\n");
+	int i=0;
+	for (i =0; i < 20; i++)
+	{
+		if(fat[i] == NULL){continue;}
+		int s;
+		printf("------- file %s -------\n", fat[i]->filename);
+		printf("current_location: %d\n", fat[i]->current_location);
+		for(s=0;s<10;s++)
+		{
+			printf("%d,",fat[i]->blockPtrs[s]);
+		}
+		printf("\n");
+	}
+}
+
+
 void decodeGlobalVariableFromFile(FILE *infile)
 {
-	
 	// read partition
 	fread(PARTITION, sizeof(Partition),1,infile);
-	printf("%d\n",PARTITION->block_size );
- 	
- 	printf("%d\n",PARTITION->numOfFiles);
-
 	// read fat
 	FileIndexObject* input;
 	input = malloc(sizeof(FileIndexObject));
@@ -72,6 +86,7 @@ void decodeGlobalVariableFromFile(FILE *infile)
 			continue;
 		}
 		fat[i] =input;
+
 		input = malloc(sizeof(FileIndexObject));
 		i++;
 
@@ -200,30 +215,6 @@ void printGlobalOpenFilePointer()
 	printf("\n");
 }
 
-
-void printFatTable()
-{	
-	printf("printing FAT table...\n");
-	int i=0;
-	for (i =0; i < 20; i++)
-	{
-		if(fat[i] == NULL){continue;}
-
-		printf("printing!");
-
-		printf (" ---- File# %d : %s ---------\n",i, fat[i]->filename); // ERROR HERE
-
-		printf (" current position: %d \n", fat[i] -> current_location);
-		printf("file pointers: ");
-		int s;
-		for(s=0;s<10;s++)
-		{
-			printf("%d,",fat[i]->blockPtrs[s]);
-		}
-		printf("\n");
-	}
-}
-
 void printFile(char*name)
 {
 	// get entire user data block
@@ -326,9 +317,10 @@ int partition(char *name, int blocksize, int totalblocks)
 	FILE *partitionP; 
 
 	//check if already exist PUT IT BACK IN !!!
-	// if( access( partitionPath, F_OK ) != -1 ) {
- //   		return -1;
-	// }
+	if( access( partitionPath, F_OK ) != -1 ) {
+   		return -1;
+	}
+
 
 
 	//create partition
@@ -342,7 +334,7 @@ int partition(char *name, int blocksize, int totalblocks)
 	// ===================================== TEST AREA =============================================
 	int firstBlockPointer = 2;
 	FileIndexObject * newFile = malloc(sizeof(FileIndexObject));
-	newFile->filename = "BTS";
+	strcpy(newFile->filename , "BTS");
 	newFile->file_length = 20;
 	int s;
 	for (s=0;s<10;s++){newFile->blockPtrs[s] =-1;}
@@ -408,7 +400,7 @@ int mount(char *name)
 
  	strcpy(mountPartitionName, name);
  	originalNumberOFObjectOffset = PARTITION->numOfFiles;
-
+ 	fclose(f);
 
 	return 0;
 }
@@ -462,7 +454,7 @@ int createFile(char *name)
 			//  create new FAT object 
 			FileIndexObject* newFile;
 			newFile = malloc(sizeof(FileIndexObject));
-			newFile->filename = name;
+			strcpy(newFile->filename, name);
 			int s;
 			for (s=0;s<10;s++){newFile->blockPtrs[s] =-1;}
 			newFile->current_location=0;
@@ -739,7 +731,7 @@ int saveToDiskBeforeQuit()
     fclose(blockFilePtr);
 
     // write everything in 
-    mountedfp= fopen(mountPartitionName,"wb");
+    mountedfp= fopen(mountPartitionName,"w");
 	encodeGlobalVariableToFile( mountedfp);
 	for (i=0;i< PARTITION->total_blocks*PARTITION->block_size; i++)
 	{
@@ -758,7 +750,9 @@ int main()
 
 	int openResult; int createResult; int writeResult;
 	// WRITING FILE TEST CASES
-	mount("./PARTITION/test3.txt");
+	int result=mount("./PARTITION/test3.txt");
+	printf("mount result: %d\n",result );
+	//exit(EXIT_SUCCESS);
 	openResult = openfile("BTS");
 
 	writeResult = writeBlock(openResult, "junko");
@@ -783,10 +777,14 @@ int main()
 
 
 	saveToDiskBeforeQuit();
+
+	printf("================= AFTER SAVED TO HARDISK =========\n");
+	printFatTable();
 	initIO();
+	printFatTable();
 
 	mount("./PARTITION/test3.txt");
-		printFatTable();
+	printFatTable();
 	copyHardDriveToBuffer();
 	printBufferContent();
 	// printFile("BTS");
