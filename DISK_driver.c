@@ -29,6 +29,7 @@ char * block_buffer;
 int block_buffer_index=0;
 FILE *fp[5];
 int fpInfo[5]; // stores the index of its corresding FileIndexObject location in fat
+int originalNumberOFObjectOffset=0;
 Partition* PARTITION;
 char mountPartitionName[500];
 
@@ -36,7 +37,8 @@ void encodeGlobalVariableToFile(FILE *partitionP)
 {
 	
 	//write information to file  PARTITION : FAT : BLOCKS
-	fwrite(PARTITION, sizeof(Partition), 1, partitionP);
+
+	fwrite(PARTITION, sizeof(Partition), 1, partitionP); // segfault
 
 	int i = 0;
 	for (i=0; i < 20; i++)
@@ -53,13 +55,15 @@ void decodeGlobalVariableFromFile(FILE *infile)
 	
 	// read partition
 	fread(PARTITION, sizeof(Partition),1,infile);
-	
+	printf("%d\n",PARTITION->block_size );
+ 	
+ 	printf("%d\n",PARTITION->numOfFiles);
+
 	// read fat
 	FileIndexObject* input;
 	input = malloc(sizeof(FileIndexObject));
 	int i=0;
 
-	printf("decoding...\n" );
 	while(fread(input, sizeof(FileIndexObject), 1, infile) && i<PARTITION->numOfFiles)
 	{
 		//input = fat[i];
@@ -68,10 +72,6 @@ void decodeGlobalVariableFromFile(FILE *infile)
 			continue;
 		}
 		fat[i] =input;
-
-		printf("filename: %s\n", fat[i]->filename);
-		printf("file length: %d\n", fat[i] ->file_length);
-		//free(input);
 		input = malloc(sizeof(FileIndexObject));
 		i++;
 
@@ -79,34 +79,70 @@ void decodeGlobalVariableFromFile(FILE *infile)
 }
 
 void wipe_block_buffer()
-{
+{ // PURPOSE: wipe the buffer and allocate space
 	free(block_buffer);
-	block_buffer =  malloc(sizeof(char)*PARTITION->total_blocks*PARTITION->block_size);
+	int totalSize =sizeof(char)*PARTITION->total_blocks*PARTITION->block_size;
+	block_buffer = malloc(totalSize);
+
+	char emptyContent[ totalSize];
+	int i;
+	for(i=0;i< totalSize;i++)
+	{
+		block_buffer[i]='0';
+	}
+	// block_buffer = malloc(totalSize);
+	// block_buffer=emptyContent;
+	// strcpy(block_buffer, emptyContent);
 }
 
 
 FILE* giveBlockNumberContentPtr(FILE* f, int i)
 {	
-// 	PURPOSE: give the pointer that point to the ith block inside partition file f
-// 	   RETURN: a NEW file ptr to the ith block
+	// 	PURPOSE: give the pointer that point to the ith block inside partition file f
+	// 	   RETURN: a NEW file ptr to the ith block
 	// FILE *fpDup = fdopen (dup (fileno (f)), "r+");
 	// int round = PARTITION->numOfFiles;
 	// fseek(fpDup, (sizeof(Partition)+(round)*sizeof(FileIndexObject)+ (i*PARTITION->block_size)), SEEK_SET);
 	// return fpDup;
 
-	FILE *fpDup = fdopen (dup (fileno (f)), "r+");
+	FILE *fpDup = fdopen (dup (fileno (f)), "rb+");
 	int j ;
 	int offsetFilesCount =0;
-	for(j =0;j<10; j++)
-	{
-		if(fat[j]!=NULL && fat[j]->file_length!=0)
-		{
-			offsetFilesCount++;
-		}
-	}
-	fseek(fpDup, (sizeof(Partition)+(offsetFilesCount)*sizeof(FileIndexObject)+ (i*PARTITION->block_size)), SEEK_SET);
+	fseek(fpDup, (sizeof(Partition)+(originalNumberOFObjectOffset)*sizeof(FileIndexObject)+ (i*PARTITION->block_size)), SEEK_SET);
 	return fpDup;
 
+}
+
+void copyHardDriveToBuffer()
+{
+	wipe_block_buffer();
+	int i=0;
+	FILE *f = fopen(mountPartitionName,"rb+");
+	FILE* writePtr = giveBlockNumberContentPtr(f, 0);
+	int c;
+	while(i<PARTITION->block_size * PARTITION->total_blocks)
+	{
+		c = fgetc(writePtr);
+		block_buffer[i] =c;
+		i++;
+	}
+	fclose(f);
+	fclose(writePtr);
+}
+
+void copyBufferToHardDrive()
+{
+	int i=0;
+	FILE *f = fopen(mountPartitionName,"rb+");
+	FILE* writePtr = giveBlockNumberContentPtr(f, 0);
+	int c;
+	while(i<PARTITION->block_size * PARTITION->total_blocks)
+	{
+		c = fputc (block_buffer[i],writePtr);
+		i++;
+	}
+	fclose(f);
+	fclose(writePtr);
 }
 
 
@@ -131,6 +167,23 @@ void printUserDataSection()
 	fclose(f);
 }
 
+void printBufferContent()
+{
+	int i=0;
+	int c;
+	printf("buffer: ");
+	for(i=0; i < PARTITION->block_size * PARTITION->total_blocks; i++)
+	{	
+		c= block_buffer[i];
+		printf("%c",c);
+		if((i+1) % PARTITION->block_size == 0 )
+		{
+			printf(" ");
+		}
+	}
+	printf("\n");
+}
+
 void printGlobalOpenFilePointer()
 {
 	int i;
@@ -142,16 +195,78 @@ void printGlobalOpenFilePointer()
 			printf("null,");
 			continue;
 		}
-		printf("%ld,", ftell(fp[i]));
+		printf("%ld(%s),", ftell(fp[i]),fat[fpInfo[i]]->filename);
 	}
 	printf("\n");
+}
+
+
+void printFatTable()
+{	
+	printf("printing FAT table...\n");
+	int i=0;
+	for (i =0; i < 20; i++)
+	{
+		if(fat[i] == NULL){continue;}
+
+		printf("printing!");
+
+		printf (" ---- File# %d : %s ---------\n",i, fat[i]->filename); // ERROR HERE
+
+		printf (" current position: %d \n", fat[i] -> current_location);
+		printf("file pointers: ");
+		int s;
+		for(s=0;s<10;s++)
+		{
+			printf("%d,",fat[i]->blockPtrs[s]);
+		}
+		printf("\n");
+	}
+}
+
+void printFile(char*name)
+{
+	// get entire user data block
+	printf("Printing content of filename: %s\n", name );
+	wipe_block_buffer();
+	FILE* mountedfp= fopen(mountPartitionName,"rb+");
+	FILE* blockFilePtr = giveBlockNumberContentPtr(mountedfp, 0);
+	int c;
+	int count=0;
+	fgets(block_buffer, PARTITION->total_blocks*PARTITION->block_size , blockFilePtr); 
+    fclose(mountedfp);
+    fclose(blockFilePtr);
+	// looping through fat
+	int i;
+	for(i =0; i < 20 ; i++)
+	{	
+		if (fat[i]!=NULL)
+		{		
+			if(strcmp(name,fat[i]->filename) == 0)
+			{
+				int j;
+				for(j=0;j<10;j++)
+				{
+					if(fat[i]->blockPtrs[j] ==-1){ return;}
+					int s;
+					for (s=0; s<PARTITION->block_size;s++)
+					{
+						printf("%c",block_buffer[fat[i]->blockPtrs[j]*PARTITION->block_size+s ]);
+					}
+					printf(" ");
+				}
+			}
+		}
+	}
+	wipe_block_buffer();
+
+	printf("No such file is found!\n");
 }
 
 int isFileAlreadyOpen(char* filename)
 {// Purpose: check if a file with "filename" is already open through looping through fp's
  // Return : its fat index if it is already open
- //			 -1 if it is not already opeN
-	printf("check if the file already opened... \n");
+ //			 -1 if it is not already open
 	int i;
 	for (i =0; i < 5; i++)
 	{
@@ -182,6 +297,12 @@ void initIO()
 		fp[i] = NULL;
 	}
 
+	// Initialize fpInfo
+	for (i =0 ; i< 5; i++)
+	{
+		fpInfo[i] =-1; 
+	}
+
 	//initialize partition 
 	PARTITION = malloc(sizeof(Partition));
 
@@ -190,7 +311,9 @@ void initIO()
 
 int partition(char *name, int blocksize, int totalblocks)
 {
-	// making partition directory if does not exist already 
+	// PURPOSE: making partition directory if does not exist already 
+	// RETURN : -1 if the file exist already
+	//			0 success
 	struct stat st = {0};
 	if (stat("./PARTITION/", &st) == -1) {
     	mkdir("./PARTITION/",  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
@@ -202,14 +325,22 @@ int partition(char *name, int blocksize, int totalblocks)
 	strcat( partitionPath, name);
 	FILE *partitionP; 
 
+	//check if already exist PUT IT BACK IN !!!
+	// if( access( partitionPath, F_OK ) != -1 ) {
+ //   		return -1;
+	// }
+
+
 	//create partition
 	PARTITION->total_blocks = totalblocks;
 	PARTITION->block_size = blocksize;
 	PARTITION->numOfFiles = 0;
-	partitionP = fopen( partitionPath, "rb+");	
+	printf("Path is : %s\n" ,partitionPath );
+
+	partitionP = fopen( partitionPath, "w");	  // problem file does not exist? 
 
 	// ===================================== TEST AREA =============================================
-	int firstBlockPointer = 5;
+	int firstBlockPointer = 2;
 	FileIndexObject * newFile = malloc(sizeof(FileIndexObject));
 	newFile->filename = "BTS";
 	newFile->file_length = 20;
@@ -223,10 +354,9 @@ int partition(char *name, int blocksize, int totalblocks)
 	PARTITION->numOfFiles = 1;
 
 	// =============================================================================================
-
-
 	//write information to file  PARTITION : FAT : BLOCKS
-	encodeGlobalVariableToFile(partitionP);
+	encodeGlobalVariableToFile(partitionP); //
+
 	int i;
 	char c ='0';
 	for (i=0;i<blocksize*totalblocks; i++)  // writing list of 0 
@@ -251,9 +381,6 @@ int partition(char *name, int blocksize, int totalblocks)
 	fclose(partitionP);
 	return 0;
 }
-
-	
-
 
 int mount(char *name)
 {
@@ -280,6 +407,8 @@ int mount(char *name)
  	block_buffer = malloc(sizeof(char)*PARTITION->total_blocks*PARTITION->block_size);
 
  	strcpy(mountPartitionName, name);
+ 	originalNumberOFObjectOffset = PARTITION->numOfFiles;
+
 
 	return 0;
 }
@@ -309,14 +438,62 @@ int findAvailableSpotInfp()
 }
 
 
-int openfile(char *name)
-{	// INPUT: the name of the file looking for
-	//RETURN: file's FAT index , -1 when FAT/fp is full, -2 if a new file is created
-	// Note: if name does not exist, file with "name" is created, no pointer assign to fp
-	//		 if name exit, FILE pointer to the first block assignmed to fp
+int createFile(char *name)
+{// PURPOSE: creating a file whose name is "name"
+ // RETURN :  i if it is created successfully 
+ // 		  -1 if failure when fat is full
+ //			  -2 if file already existed
+	int j;
+	for (j =0; j< 20; j++)
+	{
+		if(fat[j] != NULL)
+		{
+			if(strcmp(fat[j]->filename,name) ==0)
+			{
+				return -2;
+			}
+		}
+	}
 
+	for (j =0; j< 20; j++) // finding an empty spot in FAT
+	{	
+		if(fat[j] == NULL)
+		{
+			//  create new FAT object 
+			FileIndexObject* newFile;
+			newFile = malloc(sizeof(FileIndexObject));
+			newFile->filename = name;
+			int s;
+			for (s=0;s<10;s++){newFile->blockPtrs[s] =-1;}
+			newFile->current_location=0;
+			newFile->file_length=0;
+
+			// add to directory 
+			fat[j] = newFile;
+			PARTITION->numOfFiles ++;
+			return j;
+		}
+	}
+	return -1;
+}
+
+
+int openfile(char *name)
+{	// PURPOSE: assuming that the file is not already open, open it from fat, and assign to global pointer
+	// INPUT: the name of the file looking for
+	//RETURN: -1 -- file with name not found 
+	// 		  -2 -- do not have more spot in fp 
+	//        -3 -- unexpected error (bug in code)
 	int i=-1; // FAT index 
 	int isFound=-1;
+
+	if(isFileAlreadyOpen(name) ==0) // already opened return 0
+	{
+		return 0;
+	}
+
+	printFatTable();
+	// ERROR EXIST BELOW
 
 	for (i =0; i < 20 ; i++) // looping through fat 
 	{
@@ -331,8 +508,6 @@ int openfile(char *name)
 			}
 		}
 	}
-	printf("is found? %d\n",isFound );
-
 
 	if (isFound == 0) //found in existing FAT 
 	{
@@ -342,7 +517,7 @@ int openfile(char *name)
 		int fpIndex=findAvailableSpotInfp();
 
 		if (fpIndex == -1){ // did not find available spot for fpIndex 
-			return -1; //error
+			return -2; //error -- do not have more spot in fp 
 		}
 		else
 		{
@@ -358,40 +533,13 @@ int openfile(char *name)
 			return i;
 		}
 	}
-	else  // did not find in existing fat 
+
+	if (isFound == -1) // didn't find empty slot in fat
 	{
-
-		int j;
-		for (j =0; j< 20; j++) // finding an empty spot in FAT
-		{
-			if(fat[j] == NULL)
-			{
-				//  create new FAT object 
-				FileIndexObject* newFile;
-				newFile = malloc(sizeof(FileIndexObject));
-				newFile->filename = name;
-				int s;
-				for (s=0;s<10;s++){newFile->blockPtrs[s] =-1;}
-				newFile->current_location=0;
-				newFile->file_length=0;
-
-				// add to directory 
-				fat[j] = newFile;
-				PARTITION->numOfFiles ++;
-				isFound =0;
-				//return j;
-				return -2;
-			}
-		}
-	
-
-		if (isFound == -1) // didn't find empty slot in fat
-		{
-			return -1; // an error occured
-		}
+		return -1; // an error occured
 	}
 
-	return -1; // should not reach here
+	return -3; // should not reach here
 }
 
 
@@ -400,12 +548,13 @@ int readBlock(int fileFATIndex)
 	//  PURPOSE: using the file FAT index number, load buffer with 1 block of data from blockID
 	//	RETURN : 0 if success; 
 	//		     -1 end of file error
+	//			 -2 invalid index
 	// 			 -3  unexpected error -- bug in the code
 	// 	NOTE : If success -- global buffer_index_pointer +1
-	//						fat entry current_position +1
+	//						fat entry current_location +1
 	if(fileFATIndex< 0 || fileFATIndex > 19)
 	{
-		return -1;
+		return -2;
 	}
 
 	FileIndexObject *currentFile = fat[fileFATIndex];
@@ -431,7 +580,7 @@ int readBlock(int fileFATIndex)
 		//exit(EXIT_SUCCESS);
 	}
 
-	if (currentFile->current_location >= 10) // read through all 20 blockPtrs
+	if (currentFile->current_location > 9) // read through all 20 blockPtrs
 	{
 		printf("reached end of file for file, cannot read more: %s\n", currentFile->filename );
 		return -1; // return error code
@@ -446,24 +595,17 @@ int readBlock(int fileFATIndex)
 
 		}
 
-		// TODO: CHECK WHAT IS THE CORRECT WAY OF DOING THIS!!!
-		wipe_block_buffer();
+		// actually reading the block 
 		int c;
-		printf("Current block num: %d\n", currentBlockNum);
 		FILE* blockPtr = giveBlockNumberContentPtr(currentfp, currentBlockNum);
+		wipe_block_buffer();
 
 		for (i=0;i<PARTITION->block_size; i++)
 		{	
 			c= fgetc(blockPtr);
-			printf("block's %d char is: %c\n", i, c);
-			//exit(EXIT_SUCCESS);
-
 			block_buffer[i]=c;
-		}
-		printf("current block num: %d\n", currentBlockNum );
-		printf("Content writing result is: %s\n", block_buffer);
 
-		//block_buffer_index++;
+		}
 		currentFile->current_location ++;
 		return 0;
 
@@ -479,165 +621,198 @@ char *returnBlock()
 
 
 int writeBlock(int fileFATIndex, char *data)
-{	
-	printf("writing data: %s\n", data);
-	// TODO: FIGURE OUT  HOW ARE WE LOADING IT INTO THE BUFFER? 
-	wipe_block_buffer();
-	strcpy(block_buffer, data);
-
-	if(fileFATIndex< 0 || fileFATIndex > 19)
-	{
-		return -1;
-	}
-
-	FileIndexObject *currentFile = fat[fileFATIndex];
+{	// PURPOSE : write to a block, assuming that that it is already open
+	// RETURN  : 0 success
+	//			 -1 reached end of file cannot write more, or ran out of space
+	//			 -2 invalid index
+    //			 -3 unexpected error : file not found
+    //			 
+	if (fileFATIndex< 0 || fileFATIndex > 19) { return -2;}
 
 	//find filepointer in fpinfo
 	int isFound =-1;
 	int i;
 	FILE* currentfp;
+	FileIndexObject* fileObject;
 	for (i=0; i< 5; i++)
 	{
 		if(fpInfo[i] == fileFATIndex)
 		{
 			isFound=0;
 			currentfp = fp[i];
+			fileObject = fat[fpInfo[i]];
 			break;
 		}
 	}
 
-	if(isFound == -1)
-	{
-		printf("writeBlock(): Error! did not found FAT entry!\n");
-		return -1;
-	}
-	else if (currentfp == NULL) // the corresponding filepointer is not open yet
-	{
-		// TODO: decide what is the correct thing to do
+	if(isFound == -1){ 
+		printf("writeBlock(): Error! did not found FAT entry!\n"); return -3;
+	}else if (currentfp == NULL ||fileObject == NULL ) {
 		printf("writeBlock(): Error! fpointer is null\n");
-		return -1;
-	}
-	else
-	{
-		if (currentFile->current_location > 9) // read through all 10 blockPtrs , no empty pointer spot
-		{
-			printf("reached end of file for file, cannot write more : %s\n", currentFile->filename );
-			return -1; // return error code
-		}
+		return -3;
+	}else{
 
-
-		// actually writing characters 
-		int c;
-		int toWriteCh;
-		FILE* writePtr= giveBlockNumberContentPtr(currentfp, 0); // beginning of the user data section
-		int isWritten=-1;
-		int j=0;
-		int roundCounter =0;
-		i=0;
-
-		printf("=========== initial fat entry info ============ \n");
-		printUserDataSection(); //TODO: for some reason that the second entry is not written? 
-		printf("file's current_location:%d\n",currentFile->current_location );
-		printf("file's pointers:\n");
-		int s;
-		for(s=0;s<10;s++)
-		{
-			printf("%d,",currentFile->blockPtrs[s]);
-		}
-
-		while(j < (PARTITION->total_blocks) && i < strlen(data) && currentFile->current_location < 10 ) // finding the next avaible empty block
-		{
-			
-			c= fgetc(writePtr);
-			printf("the char is: %c\n",c );
-			if(c == '0') // it is an unused block
-			{
-				fclose(writePtr);
-				writePtr = giveBlockNumberContentPtr(currentfp, 0);// rewind to beginning of the user data section
-				fseek(writePtr,j*PARTITION->block_size, SEEK_CUR); // prepare to write at current position
-
-				while( i < strlen(data) && roundCounter < PARTITION->block_size)
-				{
-					toWriteCh=data[i];
-					printf("writing char: %c\n", toWriteCh);
-					int result= fputc(toWriteCh, writePtr);
-					// if (result!=toWriteCh)
-					// {
-					// 	printf("error!\n");
-					// 	exit(EXIT_SUCCESS);
-					// }
-					i++;
-					roundCounter++;
-				}
-
-				currentFile->blockPtrs[currentFile->current_location] = j;
-				currentFile->current_location ++;
-				// TODO: change file_length ?
-				isWritten=0;
-				printf("===========written one block at block# %d============ \n", j);
-				printf("file's current_location:%d\n",currentFile->current_location );
-				printf("file's pointers:\n");
-				printUserDataSection();
-
-				int s;
-				for(s=0;s<10;s++)
-				{
-					printf("%d,",currentFile->blockPtrs[s]);
-				}
-			}
-
-			if (isWritten == 0) // prepare for next round
-			{
-				isWritten=-1;
-				roundCounter=0;
-			}
-			j++;
-
-		}
-
-		if (i < strlen(data) && isWritten==-1)
-		{
-			printf("Error: due to lack of space cannot write the whole thing!\n");
+		if (fileObject->current_location > 9) {
+			printf("No more space to write!\n");
 			return -1;
 		}
+
+		int dataIndex=0; int blockIndex=0;  int ch;
+		copyHardDriveToBuffer();
+		printBufferContent(); 
+		while(dataIndex < strlen(data) && fileObject->current_location < 10 && blockIndex < PARTITION->total_blocks)
+		{	
+			printf("------- %s examining block# %d------\n", fat[fileFATIndex]->filename,blockIndex);//,PARTITION->block_size*blockIndex);
+			ch = block_buffer[PARTITION->block_size*blockIndex];
+			printf("its first character : %c\n", ch);
+			if (ch=='0') // the block is unused
+			{
+				int withinBlockCounter=0;
+				while(withinBlockCounter < PARTITION->block_size && dataIndex < strlen(data) )
+				{
+					int offset = PARTITION->block_size*blockIndex + withinBlockCounter;
+					block_buffer[offset] = data[dataIndex];
+					withinBlockCounter++;
+					dataIndex ++;
+				}
+				printf("written at block# %d\n", blockIndex);
+				printBufferContent();
+
+				fileObject->blockPtrs[fileObject->current_location] = blockIndex;
+				fileObject->current_location++;
+				fileObject->file_length++;
+			}
+			blockIndex++;
+		}
+
+		copyBufferToHardDrive();
+
+		if(dataIndex < strlen(data))
+		{
+			printf("Not enough space to write data!\n");
+			return -1;
+		}
+
+		//printFatTable();
+		//printBufferContent();
+
+		//exit(EXIT_SUCCESS);
 		return 0;
 	}
-	return -1; // never should reach here
+	return -3;
 }
 
 
+int saveToDiskBeforeQuit()
+{ //To be called before quit
+
+	// rewind all open files pointer 
+	printf("Saving it to disk....\n" );
+	int i;
+	int fatIndex=-1; 
+	for(i =0; i < 5; i++)
+	{
+		if(fp[i]!= NULL)
+		{
+			fatIndex = fpInfo[i];
+			fat[fatIndex]->current_location =0;
+			fclose(fp[i]); 
+			fp[i] = NULL; //wipe the slot
+			fpInfo[i] = -1; // wipe the slot
+		}
+	}
+
+	// copy the entire block of data to buffer 
+	wipe_block_buffer();
+	FILE* mountedfp= fopen(mountPartitionName,"rb+");
+	FILE* blockFilePtr = giveBlockNumberContentPtr(mountedfp, 0);
+	int c;
+	int count=0;
+	for (i=0; i < PARTITION->total_blocks*PARTITION->block_size ; i++)
+	{
+		c=fgetc(blockFilePtr);
+		block_buffer[i] = c;
+		printf("%c",c);
+	}
+	//fgets(block_buffer, PARTITION->total_blocks*PARTITION->block_size , blockFilePtr); 
+    fclose(mountedfp);
+    fclose(blockFilePtr);
+
+    // write everything in 
+    mountedfp= fopen(mountPartitionName,"wb");
+	encodeGlobalVariableToFile( mountedfp);
+	for (i=0;i< PARTITION->total_blocks*PARTITION->block_size; i++)
+	{
+		c= block_buffer[i];
+		int result= putc(c,  mountedfp) ;
+	}
+	fclose(mountedfp);
+}
+
 int main()
 {
+
 	initIO();
-	partition("test.txt", 2, 10);
+	partition("test3.txt", 5, 5);
 	initIO();
 
+	int openResult; int createResult; int writeResult;
 	// WRITING FILE TEST CASES
-	mount("./PARTITION/test.txt");
-	int openResult = openfile("EXO");
-	openResult = openfile("EXO");
-		printGlobalOpenFilePointer();
-
+	mount("./PARTITION/test3.txt");
 	openResult = openfile("BTS");
-		printGlobalOpenFilePointer();
+
+	writeResult = writeBlock(openResult, "junko");
+
+	openResult = openfile("EXO");
+	createResult = createFile("EXO");
+	printFatTable();
+
+	openResult = openfile("EXO");
+	writeResult = writeBlock(openResult, "xiuminCHEN");
+	printf("writefile() result: %d\n",writeResult);
+	createResult = createFile("SEVENTEEN");
+	openResult = openfile("SEVENTEEN");
+
+	writeResult = writeBlock(4, "SC");
 
 
 
-	printf("%d", isFileAlreadyOpen("BTS"));
-	printGlobalOpenFilePointer();
-	/*int openResult = openfile("BTS");
-	printGlobalOpenFilePointer();
+	//printFatTable();
 	printUserDataSection();
+	printGlobalOpenFilePointer();
+
+
+	saveToDiskBeforeQuit();
+	initIO();
+
+	mount("./PARTITION/test3.txt");
+		printFatTable();
+	copyHardDriveToBuffer();
+	printBufferContent();
+	// printFile("BTS");
+
+	// int readBlockResult = 0;
+	// openResult=openfile("BTS");
+	// while (readBlockResult >=0)
+	// {
+	// 	readBlockResult= readBlock(openResult);
+	// 	printf("buffer result: %s\n", block_buffer);
+
+	// }
+
+
+
+
 
 	//int writeResult= writeBlock(openResult,"BTSISTHEBEST!AND I ALSO LOVE EXO"); //"BTSISTHEBEST!"
-	openResult = openfile("EXO");
+	/*openResult = openfile("EXO");
 	printGlobalOpenFilePointer();
 	printUserDataSection();
 	printf("openfile() result: %d\n",openResult );
 	openResult = openfile("EXO");
 	printGlobalOpenFilePointer();
 
-	printf("openfile() result: %d\n",openResult );
+	
 	
 	int readBlockResult=readBlock(openResult);
 	printf("readBlock() result: %d\n",readBlockResult );
